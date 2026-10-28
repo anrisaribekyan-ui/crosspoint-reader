@@ -30,6 +30,7 @@
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "x3/X3Service.h"
 
 namespace {
 // Metalio: B/W sleep images use the full 0xF7 waveform instead of HALF (two
@@ -730,13 +731,34 @@ void SleepActivity::renderCustomSleepScreen() const {
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
 void SleepActivity::renderDefaultSleepScreen() const {
+  // Launcher sleep screen: /avatar.bmp full screen if present, otherwise date and verse of the day.
+  if (renderCustomSleepBmp("/avatar.bmp")) return;
+
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+  x3svc::begin();
+  const auto& pack = x3svc::pack();
 
   renderer.clearScreen();
-  renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
+  const int margin = 30;
+  int y = pageHeight / 4;
+  if (pack.valid) {
+    renderer.drawCenteredText(UI_12_FONT_ID, y, pack.weekday.c_str(), true, EpdFontFamily::BOLD);
+    y += renderer.getLineHeight(UI_12_FONT_ID) + 8;
+    renderer.drawCenteredText(UI_12_FONT_ID, y, pack.dateText.c_str());
+    y += renderer.getLineHeight(UI_12_FONT_ID) * 2;
+    if (!pack.verseText.empty()) {
+      const int lh = renderer.getLineHeight(UI_10_FONT_ID);
+      for (const auto& line : renderer.wrappedText(UI_10_FONT_ID, pack.verseText.c_str(), pageWidth - 2 * margin, 9)) {
+        renderer.drawCenteredText(UI_10_FONT_ID, y, line.c_str());
+        y += lh;
+      }
+      renderer.drawCenteredText(SMALL_FONT_ID, y + 10, pack.verseRef.c_str());
+    }
+  } else {
+    renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 20, "X3", true, EpdFontFamily::BOLD);
+  }
+  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 60, tr(STR_SLEEPING));
 
   // Make sleep screen dark unless light is selected in settings
   if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT) {

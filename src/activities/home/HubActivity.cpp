@@ -52,9 +52,9 @@ void HubActivity::openTile(int index) {
     case 3:
       page = Page::Prayer;
       break;
-    case 4:
-      page = Page::Services;
-      break;
+    case 4:  // Bible
+      activityManager.goToFileBrowser("/Bible");
+      return;
     default:
       page = Page::Apps;
       break;

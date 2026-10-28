@@ -10,6 +10,7 @@
 
 #include "MappedInputManager.h"
 #include "activities/ActivityManager.h"
+#include "activities/x3/X3GameActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/QrUtils.h"
@@ -20,9 +21,9 @@ constexpr size_t kTextMax = 12 * 1024;
 constexpr int kMaxNotes = 40;
 constexpr int kPad = 14;
 
-const char* kAppNames[] = {"Заметки", "Календарь",         "QR сервера", "Фокус 25",
-                           "Библия",  "Настройки / Wi-Fi", "Обновление"};
-constexpr int kAppCount = 7;
+const char* kAppNames[] = {"Заметки", "Календарь",         "Игры",      "QR сервера", "Фокус 25",
+                           "Сервисы", "Настройки / Wi-Fi", "Обновление"};
+constexpr int kAppCount = 8;
 
 std::string num(int v) { return std::to_string(v); }
 
@@ -94,6 +95,8 @@ int X3PageActivity::itemCount() const {
       return static_cast<int>(x3svc::pack().todayItems.size());
     case Page::Apps:
       return kAppCount;
+    case Page::Games:
+      return X3GameActivity::kGameCount;
     case Page::Notes:
       return static_cast<int>(names.size());
     default:
@@ -126,11 +129,16 @@ void X3PageActivity::activate() {
     case Page::Apps:
       if (sel == 0) open(Page::Notes);
       if (sel == 1) open(Page::Calendar);
-      if (sel == 2) open(Page::Qr);
-      if (sel == 3) open(Page::Focus);
-      if (sel == 4) activityManager.goToFileBrowser("/Bible");
-      if (sel == 5) activityManager.goToSettings();
-      if (sel == 6) open(Page::Update);
+      if (sel == 2) open(Page::Games);
+      if (sel == 3) open(Page::Qr);
+      if (sel == 4) open(Page::Focus);
+      if (sel == 5) open(Page::Services);
+      if (sel == 6) activityManager.goToSettings();
+      if (sel == 7) open(Page::Update);
+      return;
+    case Page::Games:
+      startActivityForResult(
+          std::make_unique<X3GameActivity>(renderer, mappedInput, static_cast<X3GameActivity::Game>(sel)), nullptr);
       return;
     case Page::Notes:
       if (sel >= 0 && sel < static_cast<int>(names.size())) open(Page::TextView, "/notes/" + names[sel]);
@@ -291,6 +299,9 @@ void X3PageActivity::render(RenderLock&&) {
     case Page::Update:
       title = "Обновление";
       break;
+    case Page::Games:
+      title = "Игры";
+      break;
   }
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, title, nullptr, false);
 
@@ -364,6 +375,17 @@ void X3PageActivity::render(RenderLock&&) {
       std::vector<std::string> rows(kAppNames, kAppNames + kAppCount);
       drawList(rows, top, bottom);
       ok = "Открыть";
+      prev = "Вверх";
+      next = "Вниз";
+      break;
+    }
+    case Page::Games: {
+      std::vector<std::string> rows;
+      for (int i = 0; i < X3GameActivity::kGameCount; i++) {
+        rows.push_back(X3GameActivity::name(static_cast<X3GameActivity::Game>(i)));
+      }
+      drawList(rows, top, bottom);
+      ok = "Играть";
       prev = "Вверх";
       next = "Вниз";
       break;

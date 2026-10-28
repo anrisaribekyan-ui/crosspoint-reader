@@ -9,7 +9,20 @@
 // Launcher pages fed by the gateway pack. One class, one page per instance.
 class X3PageActivity final : public Activity {
  public:
-  enum class Page : uint8_t { English, Today, Prayer, Services, Apps, Notes, TextView, Calendar, Qr, Focus, Update };
+  enum class Page : uint8_t {
+    English,
+    Today,
+    Prayer,
+    Services,
+    Apps,
+    Notes,
+    TextView,
+    Calendar,
+    Qr,
+    Focus,
+    Update,
+    Games
+  };
 
  private:
   Page page;

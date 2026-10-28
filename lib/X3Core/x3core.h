@@ -157,8 +157,7 @@ inline std::vector<Tile> hubTiles(const Pack& p) {
   t[2] = {"[03] СЕГОДНЯ", std::to_string(p.todayDone) + "/" + std::to_string(p.todayTotal), "задач из Распорядка",
           false, Screen::Calendar};
   t[3] = {"[04] ВЕРА", "Молитвослов", "стих дня · " + p.verseRef, true, Screen::Prayer};
-  std::string vpn = p.vpn == "online" ? "VPN ● онлайн" : p.vpn == "offline" ? "VPN ○ офлайн" : "VPN ? нет данных";
-  t[4] = {"[05] СЕРВИСЫ", "WB " + std::to_string(p.wbOrders), vpn, false, Screen::Settings};
+  t[4] = {"[05] БИБЛИЯ", "Синодальный", "читать · папка /Bible", true, Screen::Bible};
   t[5] = {"[06] ПРИЛОЖЕНИЯ", "Игры · QR", "Заметки · скрипты с SD", true, Screen::Apps};
   return t;
 }
