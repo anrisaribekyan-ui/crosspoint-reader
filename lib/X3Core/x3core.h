@@ -2,8 +2,10 @@
 // Ядро лаунчера X3: только стандартный C++17, без Arduino. Проверяется на хосте.
 // Содержит: время, модель плиток главного экрана, навигацию кнопками, очередь отправки.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,8 +16,22 @@ constexpr int kW = 528;
 constexpr int kH = 792;
 
 enum class Screen : uint8_t {
-  Hub, Reader, Sleep, English, Library, Apps, Settings, Wifi,
-  Prayer, Bible, Notes, Calendar, QR, Focus, Update, Offline
+  Hub,
+  Reader,
+  Sleep,
+  English,
+  Library,
+  Apps,
+  Settings,
+  Wifi,
+  Prayer,
+  Bible,
+  Notes,
+  Calendar,
+  QR,
+  Focus,
+  Update,
+  Offline
 };
 enum class Key : uint8_t { Back, Ok, OkLong, Left, Right };
 enum class Act : uint8_t { None, Redraw, Sync, GoSleep };
@@ -99,9 +115,12 @@ inline std::string staleLabel(int64_t now, int64_t updated, int offsetSec) {
   civilFromUnix(updated, offsetSec, y2, m2, d2, h2, i2);
   int64_t dayDiff = daysFromCivil(y1, m1, d1) - daysFromCivil(y2, m2, d2);
   char buf[48];
-  if (dayDiff == 0) std::snprintf(buf, sizeof buf, "обновлено %02d:%02d", h2, i2);
-  else if (dayDiff == 1) std::snprintf(buf, sizeof buf, "вчера %02d:%02d", h2, i2);
-  else std::snprintf(buf, sizeof buf, "%02d.%02d %02d:%02d", d2, m2, h2, i2);
+  if (dayDiff == 0)
+    std::snprintf(buf, sizeof buf, "обновлено %02d:%02d", h2, i2);
+  else if (dayDiff == 1)
+    std::snprintf(buf, sizeof buf, "вчера %02d:%02d", h2, i2);
+  else
+    std::snprintf(buf, sizeof buf, "%02d.%02d %02d:%02d", d2, m2, h2, i2);
   return buf;
 }
 
@@ -135,8 +154,8 @@ inline std::vector<Tile> hubTiles(const Pack& p) {
   t[0] = {"[01] ЧТЕНИЕ", std::to_string(p.readPct) + "%",
           truncCp(p.readTitle, 16) + " · гл. " + std::to_string(p.readChapter), false, Screen::Reader};
   t[1] = {"[02] ENGLISH", std::to_string(p.englishDue), "карточек к повтору", false, Screen::English};
-  t[2] = {"[03] СЕГОДНЯ", std::to_string(p.todayDone) + "/" + std::to_string(p.todayTotal),
-          "задач из Распорядка", false, Screen::Calendar};
+  t[2] = {"[03] СЕГОДНЯ", std::to_string(p.todayDone) + "/" + std::to_string(p.todayTotal), "задач из Распорядка",
+          false, Screen::Calendar};
   t[3] = {"[04] ВЕРА", "Молитвослов", "стих дня · " + p.verseRef, true, Screen::Prayer};
   std::string vpn = p.vpn == "online" ? "VPN ● онлайн" : p.vpn == "offline" ? "VPN ○ офлайн" : "VPN ? нет данных";
   t[4] = {"[05] СЕРВИСЫ", "WB " + std::to_string(p.wbOrders), vpn, false, Screen::Settings};
@@ -147,25 +166,42 @@ inline std::vector<Tile> hubTiles(const Pack& p) {
 // ---------- навигация ----------
 inline Screen parentOf(Screen s) {
   switch (s) {
-    case Screen::Wifi: case Screen::Update: return Screen::Settings;
-    case Screen::Reader: return Screen::Library;
-    case Screen::Focus: case Screen::QR: case Screen::Notes: return Screen::Apps;
-    default: return Screen::Hub;
+    case Screen::Wifi:
+    case Screen::Update:
+      return Screen::Settings;
+    case Screen::Reader:
+      return Screen::Library;
+    case Screen::Focus:
+    case Screen::QR:
+    case Screen::Notes:
+      return Screen::Apps;
+    default:
+      return Screen::Hub;
   }
 }
 
 inline int defaultItemCount(Screen s) {
   switch (s) {
-    case Screen::Settings: return 11;
-    case Screen::Apps: return 10;
-    case Screen::Library: return 8;
-    case Screen::Wifi: return 4;
-    case Screen::Prayer: return 8;
-    case Screen::Bible: return 6;
-    case Screen::Notes: return 6;
-    case Screen::QR: return 3;
-    case Screen::Update: return 6;
-    default: return 0;
+    case Screen::Settings:
+      return 11;
+    case Screen::Apps:
+      return 10;
+    case Screen::Library:
+      return 8;
+    case Screen::Wifi:
+      return 4;
+    case Screen::Prayer:
+      return 8;
+    case Screen::Bible:
+      return 6;
+    case Screen::Notes:
+      return 6;
+    case Screen::QR:
+      return 3;
+    case Screen::Update:
+      return 6;
+    default:
+      return 0;
   }
 }
 
@@ -185,26 +221,37 @@ struct Nav {
   // Что открывает «Ок» на пункте списка (Hub, если ничего).
   Screen okTarget() const {
     switch (cur) {
-      case Screen::Settings: return item <= 1 ? Screen::Wifi : item == 9 ? Screen::Update : Screen::Hub;
-      case Screen::Apps: return item == 6 ? Screen::QR : item == 7 ? Screen::Notes : item == 9 ? Screen::Focus : Screen::Hub;
-      case Screen::Library: return item == 0 ? Screen::Bible : Screen::Reader;
-      default: return Screen::Hub;
+      case Screen::Settings:
+        return item <= 1 ? Screen::Wifi : item == 9 ? Screen::Update : Screen::Hub;
+      case Screen::Apps:
+        return item == 6 ? Screen::QR : item == 7 ? Screen::Notes : item == 9 ? Screen::Focus : Screen::Hub;
+      case Screen::Library:
+        return item == 0 ? Screen::Bible : Screen::Reader;
+      default:
+        return Screen::Hub;
     }
   }
 
   Act handle(Key k) {
     if (cur == Screen::Hub) {
       switch (k) {
-        case Key::Left: sel = (sel + kHubTiles - 1) % kHubTiles; return Act::Redraw;
-        case Key::Right: sel = (sel + 1) % kHubTiles; return Act::Redraw;
+        case Key::Left:
+          sel = (sel + kHubTiles - 1) % kHubTiles;
+          return Act::Redraw;
+        case Key::Right:
+          sel = (sel + 1) % kHubTiles;
+          return Act::Redraw;
         case Key::Ok: {
-          static const Screen targets[kHubTiles] = {Screen::Reader, Screen::English, Screen::Calendar,
+          static const Screen targets[kHubTiles] = {Screen::Reader, Screen::English,  Screen::Calendar,
                                                     Screen::Prayer, Screen::Settings, Screen::Apps};
           open(targets[sel]);
           return Act::Redraw;
         }
-        case Key::OkLong: return Act::Sync;
-        case Key::Back: cur = Screen::Sleep; return Act::GoSleep;
+        case Key::OkLong:
+          return Act::Sync;
+        case Key::Back:
+          cur = Screen::Sleep;
+          return Act::GoSleep;
       }
     }
     if (cur == Screen::Sleep) {
@@ -213,7 +260,9 @@ struct Nav {
       return Act::Redraw;
     }
     switch (k) {
-      case Key::Back: open(parentOf(cur)); return Act::Redraw;
+      case Key::Back:
+        open(parentOf(cur));
+        return Act::Redraw;
       case Key::Ok: {
         Screen t = okTarget();
         if (t != Screen::Hub) open(t);
@@ -225,7 +274,8 @@ struct Nav {
       case Key::Right:
         if (itemCount > 0) item = (item + 1) % itemCount;
         return Act::Redraw;
-      case Key::OkLong: return Act::Sync;
+      case Key::OkLong:
+        return Act::Sync;
     }
     return Act::None;
   }
@@ -251,14 +301,28 @@ inline std::string jsonEscape(const std::string& s) {
   std::string o;
   for (char c : s) {
     switch (c) {
-      case '"': o += "\\\""; break;
-      case '\\': o += "\\\\"; break;
-      case '\n': o += "\\n"; break;
-      case '\r': o += "\\r"; break;
-      case '\t': o += "\\t"; break;
+      case '"':
+        o += "\\\"";
+        break;
+      case '\\':
+        o += "\\\\";
+        break;
+      case '\n':
+        o += "\\n";
+        break;
+      case '\r':
+        o += "\\r";
+        break;
+      case '\t':
+        o += "\\t";
+        break;
       default:
-        if (static_cast<unsigned char>(c) < 0x20) { char b[8]; std::snprintf(b, sizeof b, "\\u%04x", c); o += b; }
-        else o += c;
+        if (static_cast<unsigned char>(c) < 0x20) {
+          char b[8];
+          std::snprintf(b, sizeof b, "\\u%04x", c);
+          o += b;
+        } else
+          o += c;
     }
   }
   return o;
@@ -300,14 +364,20 @@ class Queue {
   void ack(const std::vector<std::string>& accepted) {
     for (const auto& id : accepted) {
       for (size_t i = 0; i < lines_.size(); ++i) {
-        if (idOf(lines_[i]) == id) { lines_.erase(lines_.begin() + static_cast<long>(i)); break; }
+        if (idOf(lines_[i]) == id) {
+          lines_.erase(lines_.begin() + static_cast<long>(i));
+          break;
+        }
       }
     }
   }
 
   std::string serialize() const {
     std::string s;
-    for (const auto& l : lines_) { s += l; s += '\n'; }
+    for (const auto& l : lines_) {
+      s += l;
+      s += '\n';
+    }
     return s;
   }
 
@@ -318,10 +388,16 @@ class Queue {
       size_t nl = text.find('\n', start);
       if (nl == std::string::npos) nl = text.size();
       std::string line = text.substr(start, nl - start);
-      if (line.size() > 2 && line.front() == '{' && line.back() == '}' && !idOf(line).empty()) q.lines_.push_back(line);
+      const std::string id = idOf(line);
+      if (line.size() > 2 && line.front() == '{' && line.back() == '}' && !id.empty()) {
+        q.lines_.push_back(line);
+        const size_t dash = id.rfind('-');
+        if (dash != std::string::npos) {
+          q.seq_ = std::max<uint32_t>(q.seq_, static_cast<uint32_t>(std::strtoul(id.c_str() + dash + 1, nullptr, 10)));
+        }
+      }
       start = nl + 1;
     }
-    q.seq_ = static_cast<uint32_t>(q.lines_.size());
     return q;
   }
 
@@ -340,7 +416,8 @@ class Queue {
 
 // Достаёт id из {"accepted":["a","b"],"rejected":[...]}. Отклонённые ридер тоже снимает с очереди
 // (иначе неверное событие будет уходить вечно): их id берём из "rejected".
-inline std::vector<std::string> parseIdList(const std::string& json, const std::string& arrayKey, const std::string& idKey = "") {
+inline std::vector<std::string> parseIdList(const std::string& json, const std::string& arrayKey,
+                                            const std::string& idKey = "") {
   std::vector<std::string> out;
   size_t p = json.find("\"" + arrayKey + "\"");
   if (p == std::string::npos) return out;

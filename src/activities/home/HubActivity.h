@@ -3,18 +3,18 @@
 
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
-#include "x3core.h"
 
-// Home screen with six tiles fed by the cached gateway pack (/cache/pack.json).
+// Home screen with six tiles fed by the gateway pack. Long-press OK syncs.
 class HubActivity final : public Activity {
   ButtonNavigator buttonNavigator;
-  x3::Pack pack;
   int selected = 0;
 
   void openTile(int index);
+  void sync();
 
  public:
-  explicit HubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput) : Activity("Hub", renderer, mappedInput) {}
+  explicit HubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity("Hub", renderer, mappedInput) {}
   void onEnter() override;
   void loop() override;
   void render(RenderLock&&) override;

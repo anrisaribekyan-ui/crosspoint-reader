@@ -5,12 +5,16 @@
 
 #include "MappedInputManager.h"
 #include "activities/ActivityManager.h"
+#include "activities/x3/X3PageActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "x3_pack.h"
+#include "x3/X3Service.h"
+#include "x3core.h"
 
 namespace {
-constexpr size_t kPackMaxBytes = 16 * 1024;
+constexpr uint32_t kEnterSyncSec = 600;
+constexpr uint32_t kHourlySyncSec = 3600;
+constexpr unsigned long kLongPressMs = 700;
 constexpr int kCols = 2;
 constexpr int kRows = 3;
 constexpr int kGap = 8;
@@ -19,25 +23,43 @@ constexpr int kPad = 8;
 
 void HubActivity::onEnter() {
   Activity::onEnter();
-  std::string json;
-  if (Storage.readFileToString("HUB", "/cache/pack.json", kPackMaxBytes, json)) {
-    x3::parsePack(json, pack);
+  x3svc::begin();
+  if (x3svc::syncDue(kEnterSyncSec)) {
+    sync();
   }
   requestUpdate();
 }
 
+void HubActivity::sync() {
+  GUI.drawPopup(renderer, "Синхронизация...");
+  x3svc::syncNow();
+  requestUpdate();
+}
+
 void HubActivity::openTile(int index) {
+  using Page = X3PageActivity::Page;
+  Page page = Page::Apps;
   switch (index) {
     case 0:  // Reading
       activityManager.goToFileBrowser();
+      return;
+    case 1:
+      page = Page::English;
       break;
-    case 4:  // Services: no screen yet, falls back to settings
-    case 5:  // Apps
-      activityManager.goToSettings();
+    case 2:
+      page = Page::Today;
+      break;
+    case 3:
+      page = Page::Prayer;
+      break;
+    case 4:
+      page = Page::Services;
       break;
     default:
-      break;  // English, Today, Faith: screens come later
+      page = Page::Apps;
+      break;
   }
+  startActivityForResult(std::make_unique<X3PageActivity>(renderer, mappedInput, page), nullptr);
 }
 
 void HubActivity::loop() {
@@ -49,9 +71,15 @@ void HubActivity::loop() {
     selected = (selected + x3::kHubTiles - 1) % x3::kHubTiles;
     requestUpdate();
   });
+  if (mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, kLongPressMs)) {
+    sync();
+    return;
+  }
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     openTile(selected);
+    return;
   }
+  if (x3svc::syncDue(kHourlySyncSec)) sync();
 }
 
 void HubActivity::render(RenderLock&&) {
@@ -60,8 +88,13 @@ void HubActivity::render(RenderLock&&) {
   const int w = renderer.getScreenWidth();
   const int h = renderer.getScreenHeight();
 
+  const auto& pack = x3svc::pack();
   const std::string title = pack.valid ? pack.weekday + ", " + pack.dateText : std::string("X3");
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, title.c_str(), nullptr, false);
+  std::string status = x3svc::freshnessLabel();
+  if (x3svc::hasConfig() && x3svc::lastAttemptSec() != 0 && x3svc::lastResult() != x3svc::Result::Ok) {
+    status += " · офлайн";
+  }
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, title.c_str(), status.c_str(), false);
 
   const int top = metrics.topPadding + metrics.headerHeight + kPad;
   const int bottom = h - metrics.buttonHintsHeight - kPad;
@@ -86,7 +119,7 @@ void HubActivity::render(RenderLock&&) {
     renderer.drawText(SMALL_FONT_ID, x + 10, y + 20 + tagH + bigH, tiles[i].sub.c_str(), ink);
   }
 
-  const auto labels = mappedInput.mapLabels("", "OK", "<", ">");
+  const auto labels = mappedInput.mapLabels("", "Открыть", "<", ">");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

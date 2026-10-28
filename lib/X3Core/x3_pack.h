@@ -1,7 +1,9 @@
 #pragma once
 // Разбор пакета /api/pack в x3::Pack. Нужен только ArduinoJson, поэтому собирается и на хосте.
 #include <ArduinoJson.h>
+
 #include <string>
+
 #include "x3core.h"
 
 namespace x3 {
