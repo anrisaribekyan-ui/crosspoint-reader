@@ -13,9 +13,11 @@
 
 #include "WifiCredentialStore.h"
 #include "activities/RenderLock.h"
+#include "network/FirmwareFlasher.h"
 #include "network/HttpDownloader.h"
 #include "network/WifiPowerSaveGuard.h"
 #include "x3_pack.h"
+#include "x3crypto.h"
 
 namespace x3svc {
 namespace {
@@ -28,6 +30,11 @@ constexpr size_t kQueueMax = 64 * 1024;
 constexpr size_t kReplyMax = 8 * 1024;
 constexpr uint32_t kJoinTimeoutMs = 12000;
 constexpr int kMinBattery = 15;
+constexpr int kMinBatteryFlash = 40;
+constexpr const char* kFwPath = "/x3/firmware.bin";
+constexpr const char* kFwShaPath = "/x3/fw.sha";
+constexpr size_t kFwMin = 200 * 1024;
+constexpr size_t kFwMax = 6553600;
 
 struct Config {
   std::string server, token, device = "x3";
@@ -153,6 +160,22 @@ void uploadQueue() {
   saveQueue();
 }
 
+void fwNoProgress(size_t, size_t, void*) {}
+
+// SHA-256 of a file on the SD card, as lowercase hex. Empty on read error.
+std::string fileSha256(const char* path) {
+  HalFile f;
+  if (!Storage.openFileForRead("X3", path, f)) return "";
+  x3c::Sha256 sha;
+  uint8_t buf[1024];
+  int n;
+  while ((n = f.read(buf, sizeof(buf))) > 0) sha.update(buf, static_cast<size_t>(n));
+  f.close();
+  uint8_t out[32];
+  sha.final(out);
+  return x3c::toHex(out, 32);
+}
+
 }  // namespace
 
 void begin() {
@@ -229,6 +252,112 @@ Result syncNow() {
   }
   LOG_DBG("X3", "sync result %d", static_cast<int>(result));
   return g_last = result;
+}
+
+FwResult updateFirmware() {
+  begin();
+  if (!g_cfg.valid() || g_cfg.server.compare(0, 8, "https://") != 0) return FwResult::NoConfig;
+  if (powerManager.getBatteryPercentage() < kMinBatteryFlash) return FwResult::LowBattery;
+  const bool wasConnected = WiFi.status() == WL_CONNECTED;
+  if (!wasConnected && !joinWifi()) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    return FwResult::NoWifi;
+  }
+
+  FwResult result = FwResult::ServerError;
+  std::string sha;
+  size_t size = 0;
+  do {
+    if (ESP.getFreeHeap() < HttpDownloader::MIN_TLS_FREE_HEAP ||
+        ESP.getMaxAllocHeap() < HttpDownloader::MIN_TLS_MAX_ALLOC) {
+      result = FwResult::NoMemory;
+      break;
+    }
+    HttpDownloader::FetchOptions options;
+    options.bearer = g_cfg.token;
+    int status = 0;
+    options.statusOut = &status;
+    std::string meta;
+    const bool got = HttpDownloader::fetchUrl(
+        g_cfg.server + "/api/firmware/meta",
+        [&meta](const uint8_t* data, size_t len) {
+          if (meta.size() + len > 1024) return false;
+          meta.append(reinterpret_cast<const char*>(data), len);
+          return true;
+        },
+        options);
+    JsonDocument d;
+    if (!got || status != 200 || deserializeJson(d, meta) != DeserializationError::Ok) break;
+    sha = d["sha256"] | "";
+    size = d["size"] | 0;
+    const std::string sig = d["sig"] | "";
+    if (sha.size() != 64 || size < kFwMin || size >= kFwMax) break;
+    if (!x3c::sameHex(sig, x3c::hmacSha256Hex(g_cfg.token, sha + ":" + std::to_string(size)))) {
+      result = FwResult::BadSignature;
+      break;
+    }
+    std::string known;
+    Storage.readFileToString("X3", kFwShaPath, 80, known);
+    if (known.compare(0, 64, sha) == 0 && known.size() >= 64) {
+      result = FwResult::UpToDate;
+      break;
+    }
+    Storage.ensureDirectoryExists(kDir);
+    Storage.remove(kFwPath);
+    const auto err = HttpDownloader::downloadToFile(g_cfg.server + "/api/firmware", kFwPath, nullptr, nullptr, "", "",
+                                                    {{"Authorization", "Bearer " + g_cfg.token}});
+    if (err != HttpDownloader::OK) break;
+    result = FwResult::Updated;  // downloaded; checked below
+  } while (false);
+
+  if (!wasConnected) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+  if (result != FwResult::Updated) return result;
+
+  if (fileSha256(kFwPath) != sha) {
+    Storage.remove(kFwPath);
+    return FwResult::BadHash;
+  }
+  if (firmware_flash::validateImageFile(kFwPath, 0) != firmware_flash::Result::OK) {
+    Storage.remove(kFwPath);
+    return FwResult::BadImage;
+  }
+  const auto flashed = firmware_flash::flashFromSdPath(kFwPath, fwNoProgress, nullptr, true);
+  Storage.remove(kFwPath);
+  if (flashed != firmware_flash::Result::OK) return FwResult::FlashFail;
+  Storage.writeFile(kFwShaPath, String(sha.c_str()));
+  return FwResult::Updated;
+}
+
+const char* fwResultText(FwResult r) {
+  switch (r) {
+    case FwResult::Updated:
+      return "Прошивка обновлена";
+    case FwResult::UpToDate:
+      return "Уже последняя версия";
+    case FwResult::NoConfig:
+      return "Нет config.json";
+    case FwResult::LowBattery:
+      return "Мало заряда (нужно 40%)";
+    case FwResult::NoWifi:
+      return "Нет известной сети Wi-Fi";
+    case FwResult::NoMemory:
+      return "Мало памяти, перезагрузи";
+    case FwResult::ServerError:
+      return "Сервер не отвечает";
+    case FwResult::BadSignature:
+      return "Подпись не сошлась";
+    case FwResult::BadHash:
+      return "Файл повреждён";
+    case FwResult::BadImage:
+      return "Образ не подходит";
+    case FwResult::FlashFail:
+      return "Ошибка записи";
+  }
+  return "";
 }
 
 std::string freshnessLabel() {

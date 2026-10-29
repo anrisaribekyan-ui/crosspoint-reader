@@ -327,15 +327,16 @@ TEST_F(ChapterHtmlSlimParserTest, UnequalTableCellsAndRubySurvivePageBreaks) {
 
 TEST(ReaderFontSizes, BuiltinVariantsStayInFamilyAndRespectSizeBounds) {
   for (const auto& family : {
-           std::array{NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID},
+           std::array{NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID,
+                      NOTOSANS_22_FONT_ID, NOTOSANS_30_FONT_ID},
        }) {
     EXPECT_EQ(builtinReaderFontVariant(family[1], 1.0f), family[1]);
-    EXPECT_EQ(builtinReaderFontVariant(family[1], 2.0f), family[3]);
+    EXPECT_EQ(builtinReaderFontVariant(family[1], 2.0f), family[5]);
     EXPECT_EQ(builtinReaderFontVariant(family[1], 1.17f), family[2]);
     EXPECT_EQ(builtinReaderFontVariant(family[1], 0.83f), family[0]);
     EXPECT_EQ(builtinReaderFontVariant(family[3], 0.9f), family[2]);
     EXPECT_EQ(builtinReaderFontVariant(family[0], 0.5f), family[0]);
-    EXPECT_EQ(builtinReaderFontVariant(family[3], 3.0f), family[3]);
+    EXPECT_EQ(builtinReaderFontVariant(family[3], 3.0f), family[5]);
     EXPECT_EQ(builtinReaderFontVariant(family[0], 1.25f), family[1]);  // ties keep the smaller size
   }
   EXPECT_EQ(builtinReaderFontVariant(12345, 2.0f), 0);
@@ -343,12 +344,13 @@ TEST(ReaderFontSizes, BuiltinVariantsStayInFamilyAndRespectSizeBounds) {
 
 TEST_F(ChapterHtmlSlimParserTest, BlockFontScaleUsesProviderAndFallsBackToBodyFont) {
   installBuiltinVariants(renderer);
-  for (const int id : {NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID}) {
+  for (const int id : {NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID,
+                       NOTOSANS_22_FONT_ID, NOTOSANS_30_FONT_ID}) {
     renderer.fontMap.emplace(id, EpdFontFamily(12, nullptr));
   }
   parser.fontId = NOTOSANS_14_FONT_ID;
   EXPECT_EQ(parser.fontIdForScale(1.0f), NOTOSANS_14_FONT_ID);
-  EXPECT_EQ(parser.fontIdForScale(2.0f), NOTOSANS_18_FONT_ID);
+  EXPECT_EQ(parser.fontIdForScale(2.0f), NOTOSANS_30_FONT_ID);
   EXPECT_EQ(parser.fontIdForScale(1.17f), NOTOSANS_16_FONT_ID);
   EXPECT_EQ(parser.fontIdForScale(0.83f), NOTOSANS_12_FONT_ID);
   EXPECT_EQ(parser.fontIdForScale(0.96f), NOTOSANS_14_FONT_ID);
@@ -1324,7 +1326,8 @@ class ChapterInlineSizeTest : public ChapterBlockDecorationTest {
   void SetUp() override {
     ChapterBlockDecorationTest::SetUp();
     installBuiltinVariants(renderer);
-    for (const int id : {NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID}) {
+    for (const int id : {NOTOSANS_12_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_18_FONT_ID,
+                         NOTOSANS_22_FONT_ID, NOTOSANS_30_FONT_ID}) {
       renderer.fontMap.emplace(id, EpdFontFamily(12, nullptr));
     }
     parser.fontId = NOTOSANS_14_FONT_ID;
@@ -1342,7 +1345,7 @@ TEST_F(ChapterInlineSizeTest, SpanHoldingWholeBlockSizesIt) {
   close("span");
   text(" ");
   close("p");
-  EXPECT_EQ(firstLineFontId(), NOTOSANS_18_FONT_ID);
+  EXPECT_EQ(firstLineFontId(), NOTOSANS_30_FONT_ID);
 }
 
 TEST_F(ChapterInlineSizeTest, ShortSizedHeadingSpanFallsBackToStyledText) {
@@ -1361,7 +1364,7 @@ TEST_F(ChapterInlineSizeTest, ShortSizedHeadingSpanFallsBackToStyledText) {
   const auto& heading = *static_cast<const PageLine*>(lines[0])->getBlock();
   ASSERT_EQ(heading.wordCount(), 1u);
   EXPECT_STREQ(heading.wordText(0), "II");
-  EXPECT_EQ(heading.getBlockStyle().fontId, NOTOSANS_18_FONT_ID);
+  EXPECT_EQ(heading.getBlockStyle().fontId, NOTOSANS_30_FONT_ID);
   EXPECT_EQ(heading.wordStyle(0), EpdFontFamily::BOLD | EpdFontFamily::ITALIC);
   const auto& following = *static_cast<const PageLine*>(lines[1])->getBlock();
   ASSERT_EQ(following.wordCount(), 1u);
@@ -1391,7 +1394,7 @@ TEST_F(ChapterInlineSizeTest, TextAfterTheSpanKeepsBodySize) {
   EXPECT_EQ(firstLineFontId(), 0);
   // The lead words keep their own size inline.
   const auto& block = *static_cast<const PageLine*>(elementsWithTag(TAG_PageLine)[0])->getBlock();
-  EXPECT_EQ(block.wordFontId(0, NOTOSANS_14_FONT_ID), NOTOSANS_18_FONT_ID);
+  EXPECT_EQ(block.wordFontId(0, NOTOSANS_14_FONT_ID), NOTOSANS_30_FONT_ID);
   EXPECT_EQ(block.wordFontId(1, NOTOSANS_14_FONT_ID), NOTOSANS_14_FONT_ID);
 }
 

@@ -5,6 +5,9 @@
 #define NOTOSANS_14_FONT_ID (-1413326613)
 #define NOTOSANS_16_FONT_ID (116566294)
 #define NOTOSANS_18_FONT_ID (-348426591)
+#define NOTOSANS_22_FONT_ID (312979529)
+#define NOTOSANS_30_FONT_ID (-1239655591)
+#define RSVP_56_FONT_ID (-13300084)
 #define UI_10_FONT_ID (1322569422)
 #define UI_12_FONT_ID (1831230762)
 #define SMALL_FONT_ID (-1769521860)
@@ -15,6 +18,9 @@ static_assert(NOTOSANS_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_14_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_16_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_18_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(NOTOSANS_22_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(NOTOSANS_30_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(RSVP_56_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");

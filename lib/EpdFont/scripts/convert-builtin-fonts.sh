@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 READER_FONT_STYLES=("Regular" "Italic" "Bold" "BoldItalic")
-NOTOSANS_FONT_SIZES=(12 14 16 18)
+NOTOSANS_FONT_SIZES=(12 14 16 18 22 30)
 
 for size in ${NOTOSANS_FONT_SIZES[@]}; do
   for style in ${READER_FONT_STYLES[@]}; do
@@ -16,6 +16,10 @@ for size in ${NOTOSANS_FONT_SIZES[@]}; do
     echo "Generated $output_path"
   done
 done
+
+# Single large bold face for the one-word reading mode.
+python fontconvert.py notosans_56_bold 56 ../builtinFonts/source/NotoSans/NotoSans-Bold.ttf --2bit --compress --pnum --zopfli > ../builtinFonts/notosans_56_bold.h
+echo "Generated ../builtinFonts/notosans_56_bold.h"
 
 UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")

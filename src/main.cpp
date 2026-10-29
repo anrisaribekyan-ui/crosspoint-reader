@@ -106,6 +106,20 @@ EpdFont notosans18ItalicFont(&notosans_18_italic);
 EpdFont notosans18BoldItalicFont(&notosans_18_bolditalic);
 EpdFontFamily notosans18FontFamily(18, &notosans18RegularFont, &notosans18BoldFont, &notosans18ItalicFont,
                                    &notosans18BoldItalicFont);
+EpdFont notosans22RegularFont(&notosans_22_regular);
+EpdFont notosans22BoldFont(&notosans_22_bold);
+EpdFont notosans22ItalicFont(&notosans_22_italic);
+EpdFont notosans22BoldItalicFont(&notosans_22_bolditalic);
+EpdFontFamily notosans22FontFamily(22, &notosans22RegularFont, &notosans22BoldFont, &notosans22ItalicFont,
+                                   &notosans22BoldItalicFont);
+EpdFont notosans30RegularFont(&notosans_30_regular);
+EpdFont notosans30BoldFont(&notosans_30_bold);
+EpdFont notosans30ItalicFont(&notosans_30_italic);
+EpdFont notosans30BoldItalicFont(&notosans_30_bolditalic);
+EpdFontFamily notosans30FontFamily(30, &notosans30RegularFont, &notosans30BoldFont, &notosans30ItalicFont,
+                                   &notosans30BoldItalicFont);
+EpdFont rsvp56Font(&notosans_56_bold);
+EpdFontFamily rsvp56FontFamily(56, &rsvp56Font);
 
 #endif  // OMIT_FONTS
 
@@ -549,6 +563,9 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NOTOSANS_12_FONT_ID, notosans12FontFamily);
   renderer.insertFont(NOTOSANS_16_FONT_ID, notosans16FontFamily);
   renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18FontFamily);
+  renderer.insertFont(NOTOSANS_22_FONT_ID, notosans22FontFamily);
+  renderer.insertFont(NOTOSANS_30_FONT_ID, notosans30FontFamily);
+  renderer.insertFont(RSVP_56_FONT_ID, rsvp56FontFamily);
 #endif  // OMIT_FONTS
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);

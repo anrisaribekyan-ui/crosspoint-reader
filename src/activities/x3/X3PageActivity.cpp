@@ -11,6 +11,7 @@
 #include "MappedInputManager.h"
 #include "activities/ActivityManager.h"
 #include "activities/x3/X3GameActivity.h"
+#include "activities/x3/X3RsvpActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/QrUtils.h"
@@ -21,9 +22,9 @@ constexpr size_t kTextMax = 12 * 1024;
 constexpr int kMaxNotes = 40;
 constexpr int kPad = 14;
 
-const char* kAppNames[] = {"Заметки", "Календарь",         "Игры",      "QR сервера", "Фокус 25",
-                           "Сервисы", "Настройки / Wi-Fi", "Обновление"};
-constexpr int kAppCount = 8;
+const char* kAppNames[] = {"Заметки", "Календарь",         "Игры",       "QR сервера",      "Фокус 25",
+                           "Сервисы", "Настройки / Wi-Fi", "Обновление", "Чтение по слову", "Обновить прошивку"};
+constexpr int kAppCount = 10;
 
 std::string num(int v) { return std::to_string(v); }
 
@@ -68,7 +69,7 @@ void X3PageActivity::loadText() {
     if (para.empty()) {
       lines.emplace_back();
     } else {
-      for (auto& l : renderer.wrappedText(UI_10_FONT_ID, para.c_str(), width, 200)) lines.push_back(std::move(l));
+      for (auto& l : renderer.wrappedText(NOTOSANS_16_FONT_ID, para.c_str(), width, 200)) lines.push_back(std::move(l));
     }
     start = nl + 1;
   }
@@ -85,7 +86,7 @@ void X3PageActivity::onEnter() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int body = renderer.getScreenHeight() - metrics.topPadding - metrics.headerHeight - metrics.buttonHintsHeight -
                    2 * metrics.verticalSpacing;
-  linesPerPage = std::max(1, body / renderer.getLineHeight(UI_10_FONT_ID));
+  linesPerPage = std::max(1, body / renderer.getLineHeight(NOTOSANS_16_FONT_ID));
   requestUpdate();
 }
 
@@ -135,6 +136,18 @@ void X3PageActivity::activate() {
       if (sel == 5) open(Page::Services);
       if (sel == 6) activityManager.goToSettings();
       if (sel == 7) open(Page::Update);
+      if (sel == 9) {
+        GUI.drawPopup(renderer, "Ищу прошивку... не выключай");
+        const auto r = x3svc::updateFirmware();
+        GUI.drawPopup(renderer, x3svc::fwResultText(r));
+        delay(r == x3svc::FwResult::Updated ? 1500 : 2500);
+        if (r == x3svc::FwResult::Updated) ESP.restart();
+        break;
+      }
+      if (sel == 8) {
+        startActivityForResult(std::make_unique<X3RsvpActivity>(renderer, mappedInput), nullptr);
+        return;
+      }
       return;
     case Page::Games:
       startActivityForResult(
@@ -242,14 +255,14 @@ int X3PageActivity::drawWrapped(const std::string& text, int fontId, int x, int 
 
 void X3PageActivity::drawList(const std::vector<std::string>& rows, int top, int bottom) {
   const int w = renderer.getScreenWidth();
-  const int rowH = renderer.getLineHeight(UI_12_FONT_ID) + 20;
+  const int rowH = renderer.getLineHeight(NOTOSANS_22_FONT_ID) + 20;
   const int visible = std::max(1, (bottom - top) / rowH);
   const int first = sel >= visible ? sel - visible + 1 : 0;
   for (int i = first; i < static_cast<int>(rows.size()) && i < first + visible; i++) {
     const int y = top + (i - first) * rowH;
     const bool on = i == sel;
     if (on) renderer.fillRect(kPad / 2, y, w - kPad, rowH - 4, true);
-    renderer.drawText(UI_12_FONT_ID, kPad, y + 8, rows[i].c_str(), !on);
+    renderer.drawText(NOTOSANS_22_FONT_ID, kPad, y + 8, rows[i].c_str(), !on);
   }
 }
 
@@ -312,20 +325,21 @@ void X3PageActivity::render(RenderLock&&) {
   switch (page) {
     case Page::English: {
       if (!p.valid || p.wordW.empty()) {
-        drawWrapped("Нет слова. Подключись к сети и нажми и удержи OK на главном экране.", UI_10_FONT_ID, kPad, top, cw,
-                    6);
+        drawWrapped("Нет слова. Подключись к сети и нажми и удержи OK на главном экране.", NOTOSANS_16_FONT_ID, kPad,
+                    top, cw, 6);
         break;
       }
-      renderer.drawCenteredText(UI_12_FONT_ID, top + 40, p.wordW.c_str(), true, EpdFontFamily::BOLD);
+      renderer.drawCenteredText(NOTOSANS_22_FONT_ID, top + 40, p.wordW.c_str(), true, EpdFontFamily::BOLD);
       const std::string meta = p.wordIpa + (p.wordPos.empty() ? "" : "  " + p.wordPos);
-      renderer.drawCenteredText(UI_10_FONT_ID, top + 40 + renderer.getLineHeight(UI_12_FONT_ID) + 10, meta.c_str());
+      renderer.drawCenteredText(NOTOSANS_16_FONT_ID, top + 40 + renderer.getLineHeight(NOTOSANS_22_FONT_ID) + 10,
+                                meta.c_str());
       const int ty = top + 200;
       if (revealed) {
-        renderer.drawCenteredText(UI_12_FONT_ID, ty, p.wordTr.c_str());
+        renderer.drawCenteredText(NOTOSANS_22_FONT_ID, ty, p.wordTr.c_str());
       }
       const std::string due = "К повтору: " + num(p.englishDue);
       renderer.drawCenteredText(SMALL_FONT_ID, bottom - 60, due.c_str());
-      if (answered) renderer.drawCenteredText(UI_10_FONT_ID, bottom - 30, "Записано. Уйдёт при синхронизации.");
+      if (answered) renderer.drawCenteredText(NOTOSANS_16_FONT_ID, bottom - 30, "Записано. Уйдёт при синхронизации.");
       ok = revealed ? "" : "Показать";
       prev = revealed && !answered ? "Не знаю" : "";
       next = revealed && !answered ? "Знаю" : "";
@@ -333,13 +347,13 @@ void X3PageActivity::render(RenderLock&&) {
     }
     case Page::Today: {
       const std::string head = num(p.todayDone) + "/" + num(p.todayTotal) + " задач";
-      renderer.drawText(UI_12_FONT_ID, kPad, top, head.c_str(), true, EpdFontFamily::BOLD);
+      renderer.drawText(NOTOSANS_22_FONT_ID, kPad, top, head.c_str(), true, EpdFontFamily::BOLD);
       std::vector<std::string> rows;
       for (size_t i = 0; i < p.todayItems.size(); i++) {
         rows.push_back(std::string(doneLocal[i] ? "[x] " : "[ ] ") + p.todayItems[i].first);
       }
       if (rows.empty()) rows.push_back("Нет данных");
-      drawList(rows, top + renderer.getLineHeight(UI_12_FONT_ID) + 16, bottom);
+      drawList(rows, top + renderer.getLineHeight(NOTOSANS_22_FONT_ID) + 16, bottom);
       ok = "Готово";
       prev = "Вверх";
       next = "Вниз";
@@ -348,12 +362,13 @@ void X3PageActivity::render(RenderLock&&) {
     case Page::Prayer: {
       int y = top;
       if (!p.verseRef.empty()) {
-        renderer.drawText(UI_10_FONT_ID, kPad, y, ("Стих дня · " + p.verseRef).c_str(), true, EpdFontFamily::BOLD);
-        y += renderer.getLineHeight(UI_10_FONT_ID) + 12;
-        y = drawWrapped(p.verseText, UI_12_FONT_ID, kPad, y, cw, 12);
+        renderer.drawText(NOTOSANS_16_FONT_ID, kPad, y, ("Стих дня · " + p.verseRef).c_str(), true,
+                          EpdFontFamily::BOLD);
+        y += renderer.getLineHeight(NOTOSANS_16_FONT_ID) + 12;
+        y = drawWrapped(p.verseText, NOTOSANS_22_FONT_ID, kPad, y, cw, 12);
       } else {
-        drawWrapped("Нет стиха дня. Нажми и удержи OK на главном экране для синхронизации.", UI_10_FONT_ID, kPad, y, cw,
-                    5);
+        drawWrapped("Нет стиха дня. Нажми и удержи OK на главном экране для синхронизации.", NOTOSANS_16_FONT_ID, kPad,
+                    y, cw, 5);
       }
       if (!p.fast.empty()) {
         renderer.drawText(SMALL_FONT_ID, kPad, bottom - renderer.getLineHeight(SMALL_FONT_ID), p.fast.c_str());
@@ -363,10 +378,10 @@ void X3PageActivity::render(RenderLock&&) {
       break;
     }
     case Page::Services: {
-      renderer.drawText(UI_12_FONT_ID, kPad, top, ("WB заказов: " + num(p.wbOrders)).c_str(), true,
+      renderer.drawText(NOTOSANS_22_FONT_ID, kPad, top, ("WB заказов: " + num(p.wbOrders)).c_str(), true,
                         EpdFontFamily::BOLD);
       const char* vpn = p.vpn == "online" ? "онлайн" : p.vpn == "offline" ? "офлайн" : "нет данных";
-      renderer.drawText(UI_12_FONT_ID, kPad, top + renderer.getLineHeight(UI_12_FONT_ID) + 20,
+      renderer.drawText(NOTOSANS_22_FONT_ID, kPad, top + renderer.getLineHeight(NOTOSANS_22_FONT_ID) + 20,
                         (std::string("VPN: ") + vpn).c_str());
       renderer.drawText(SMALL_FONT_ID, kPad, bottom - renderer.getLineHeight(SMALL_FONT_ID), fresh.c_str());
       break;
@@ -400,10 +415,10 @@ void X3PageActivity::render(RenderLock&&) {
       break;
     }
     case Page::TextView: {
-      const int lh = renderer.getLineHeight(UI_10_FONT_ID);
+      const int lh = renderer.getLineHeight(NOTOSANS_16_FONT_ID);
       const int from = textPage * linesPerPage;
       for (int i = 0; i < linesPerPage && from + i < static_cast<int>(lines.size()); i++) {
-        renderer.drawText(UI_10_FONT_ID, kPad, top + i * lh, lines[from + i].c_str());
+        renderer.drawText(NOTOSANS_16_FONT_ID, kPad, top + i * lh, lines[from + i].c_str());
       }
       prev = "Назад";
       next = "Далее";
@@ -411,21 +426,21 @@ void X3PageActivity::render(RenderLock&&) {
     }
     case Page::Calendar: {
       if (!p.valid) {
-        drawWrapped("Нет данных. Нужна синхронизация.", UI_10_FONT_ID, kPad, top, cw, 3);
+        drawWrapped("Нет данных. Нужна синхронизация.", NOTOSANS_16_FONT_ID, kPad, top, cw, 3);
         break;
       }
-      renderer.drawCenteredText(UI_12_FONT_ID, top + 30, p.weekday.c_str(), true, EpdFontFamily::BOLD);
-      renderer.drawCenteredText(UI_12_FONT_ID, top + 30 + renderer.getLineHeight(UI_12_FONT_ID) + 8,
+      renderer.drawCenteredText(NOTOSANS_22_FONT_ID, top + 30, p.weekday.c_str(), true, EpdFontFamily::BOLD);
+      renderer.drawCenteredText(NOTOSANS_22_FONT_ID, top + 30 + renderer.getLineHeight(NOTOSANS_22_FONT_ID) + 8,
                                 p.dateText.c_str());
       int y = top + 160;
-      if (!p.fast.empty()) y = drawWrapped("Пост: " + p.fast, UI_10_FONT_ID, kPad, y, cw, 3) + 12;
+      if (!p.fast.empty()) y = drawWrapped("Пост: " + p.fast, NOTOSANS_16_FONT_ID, kPad, y, cw, 3) + 12;
       const std::string t = "Задачи: " + num(p.todayDone) + "/" + num(p.todayTotal);
-      renderer.drawText(UI_10_FONT_ID, kPad, y, t.c_str());
+      renderer.drawText(NOTOSANS_16_FONT_ID, kPad, y, t.c_str());
       break;
     }
     case Page::Qr: {
       if (!x3svc::hasConfig()) {
-        drawWrapped("Нет config.json на карте.", UI_10_FONT_ID, kPad, top, cw, 3);
+        drawWrapped("Нет config.json на карте.", NOTOSANS_16_FONT_ID, kPad, top, cw, 3);
         break;
       }
       const int side = std::min(cw, bottom - top - 40);
@@ -437,8 +452,8 @@ void X3PageActivity::render(RenderLock&&) {
       char buf[16];
       shownMin = running ? remainingMin() : focusMin;
       std::snprintf(buf, sizeof(buf), "%d мин", shownMin);
-      renderer.drawCenteredText(UI_12_FONT_ID, top + 120, buf, true, EpdFontFamily::BOLD);
-      if (finished) renderer.drawCenteredText(UI_12_FONT_ID, top + 220, "Время вышло");
+      renderer.drawCenteredText(NOTOSANS_22_FONT_ID, top + 120, buf, true, EpdFontFamily::BOLD);
+      if (finished) renderer.drawCenteredText(NOTOSANS_22_FONT_ID, top + 220, "Время вышло");
       ok = running ? "Стоп" : "Старт";
       prev = running ? "" : "-5";
       next = running ? "" : "+5";
@@ -452,9 +467,9 @@ void X3PageActivity::render(RenderLock&&) {
       rows.push_back("Данные: " + fresh);
       rows.push_back("Очередь: " + num(static_cast<int>(x3svc::queued())));
       rows.push_back(std::string("Итог: ") + x3svc::resultText(x3svc::lastResult()));
-      const int lh = renderer.getLineHeight(UI_10_FONT_ID) + 14;
+      const int lh = renderer.getLineHeight(NOTOSANS_16_FONT_ID) + 14;
       for (size_t i = 0; i < rows.size(); i++) {
-        renderer.drawText(UI_10_FONT_ID, kPad, top + static_cast<int>(i) * lh, rows[i].c_str());
+        renderer.drawText(NOTOSANS_16_FONT_ID, kPad, top + static_cast<int>(i) * lh, rows[i].c_str());
       }
       ok = "Обновить";
       break;

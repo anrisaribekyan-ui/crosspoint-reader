@@ -3,6 +3,8 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 
+#include <cmath>
+
 #include "MappedInputManager.h"
 #include "activities/ActivityManager.h"
 #include "activities/x3/X3PageActivity.h"
@@ -31,8 +33,10 @@ void HubActivity::onEnter() {
 }
 
 void HubActivity::sync() {
-  GUI.drawPopup(renderer, "Синхронизация...");
+  syncing = true;
+  requestUpdateAndWait();
   x3svc::syncNow();
+  syncing = false;
   requestUpdate();
 }
 
@@ -82,6 +86,21 @@ void HubActivity::loop() {
   if (x3svc::syncDue(kHourlySyncSec)) sync();
 }
 
+namespace {
+// Wi-Fi symbol: a dot and three arcs, drawn with small squares.
+void drawWifiIcon(const GfxRenderer& r, int cx, int baseY) {
+  r.fillRect(cx - 3, baseY - 3, 6, 6, true);
+  for (int radius = 12; radius <= 36; radius += 12) {
+    for (int deg = -45; deg <= 45; deg += 5) {
+      const float a = static_cast<float>(deg) * 3.14159265f / 180.0f;
+      const int x = cx + static_cast<int>(std::sin(a) * radius);
+      const int y = baseY - static_cast<int>(std::cos(a) * radius);
+      r.fillRect(x - 1, y - 1, 3, 3, true);
+    }
+  }
+}
+}  // namespace
+
 void HubActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -95,6 +114,8 @@ void HubActivity::render(RenderLock&&) {
     status += " · офлайн";
   }
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, title.c_str(), status.c_str(), false);
+
+  if (syncing) drawWifiIcon(renderer, w - 40, metrics.topPadding + 44);
 
   const int top = metrics.topPadding + metrics.headerHeight + kPad;
   const int bottom = h - metrics.buttonHintsHeight - kPad;

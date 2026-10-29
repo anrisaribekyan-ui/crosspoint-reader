@@ -30,6 +30,26 @@ bool syncDue(uint32_t intervalSec);
 void pushEvent(const char* type, const std::string& payloadJson);
 size_t queued();
 
+// Firmware update over the air from the gateway (/api/firmware/meta, /api/firmware).
+// The image is accepted only when its SHA-256 matches a meta record signed with the
+// gateway token (HMAC-SHA256), and it also passes the normal image checks.
+enum class FwResult : uint8_t {
+  Updated,  // flashed; caller restarts
+  UpToDate,
+  NoConfig,
+  LowBattery,
+  NoWifi,
+  NoMemory,
+  ServerError,
+  BadSignature,
+  BadHash,
+  BadImage,
+  FlashFail
+};
+// Blocking, takes a minute or two. Does not restart.
+FwResult updateFirmware();
+const char* fwResultText(FwResult r);
+
 // Text for "updated HH:MM" style labels; falls back to "нет данных".
 std::string freshnessLabel();
 const char* resultText(Result r);

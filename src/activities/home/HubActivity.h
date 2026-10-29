@@ -8,6 +8,7 @@
 class HubActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selected = 0;
+  bool syncing = false;  // shows the Wi-Fi icon
 
   void openTile(int index);
   void sync();
