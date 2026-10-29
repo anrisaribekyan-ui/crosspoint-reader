@@ -43,6 +43,20 @@ jobs:
           uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
       - name: Build
         run: pio run -e default
+      - name: Check size
+        id: size
+        run: |
+          SIZE=$(stat -c%s .pio/build/default/firmware.bin)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "firmware.bin: $SIZE bytes (partition limit 6553600)" >> "$GITHUB_STEP_SUMMARY"
+          echo "$SIZE" > size.txt
+          test "$SIZE" -lt 6553600
+      - name: Upload size marker
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: size-${{ steps.size.outputs.size }}
+          path: size.txt
       - name: Upload firmware
         uses: actions/upload-artifact@v6
         with:
